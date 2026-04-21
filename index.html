@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Password Manager- Murad Hasan</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #001a1a; --accent: #00d2ff; --card: #002b2b; --text: #ffffff;
+            --input-bg: rgba(255, 255, 255, 0.05); --border: rgba(255, 255, 255, 0.1);
+            --error: #ff4b2b; --success: #00c853;
+            --warning: #ffb300; 
+            --fav: #ff4081;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; transition: 0.3s; }
+        body { background: var(--bg); color: var(--text); margin: 0; padding-bottom: 90px; overflow-x: hidden; }
+
+        .app-header {
+            display: none; align-items: center; justify-content: space-between;
+            padding: 12px 15px; background: rgba(0,26,26,0.9);
+            position: sticky; top: 0; z-index: 1000; backdrop-filter: blur(15px);
+            border-bottom: 1px solid var(--border);
+        }
+        .status-container { display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .online-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .offline-dot { background: var(--error); box-shadow: 0 0 8px var(--error); }
+
+        .user-logo {
+            width: 35px; height: 35px; border-radius: 50%;
+            background: var(--accent); color: #001a1a;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 16px; cursor: pointer;
+            overflow: hidden; border: 1px solid var(--border);
+        }
+        .user-logo img { width: 100%; height: 100%; object-fit: cover; }
+
+        .page { display: none; padding: 15px; max-width: 500px; margin: auto; animation: fadeIn 0.4s ease; }
+        .active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .category-wrapper {
+            display: flex; overflow-x: auto; gap: 10px; padding: 10px 0 15px 0;
+            scrollbar-width: none; -webkit-overflow-scrolling: touch;
+        }
+        .category-wrapper::-webkit-scrollbar { display: none; }
+        .cat-chip {
+            padding: 7px 18px; background: var(--card); border: 1px solid var(--border);
+            border-radius: 20px; font-size: 13px; white-space: nowrap; cursor: pointer;
+        }
+        .cat-active { background: var(--accent); color: #001a1a; border-color: var(--accent); font-weight: bold; }
+
+        .vault-item {
+            background: var(--card); border-radius: 18px; padding: 15px; 
+            margin-bottom: 12px; border: 1px solid var(--border);
+            position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+        .data-row {
+            background: rgba(255,255,255,0.03); padding: 10px 12px; border-radius: 12px; 
+            display: flex; justify-content: space-between; align-items: center; margin-top: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .input-group { position: relative; width: 100%; margin-bottom: 10px; }
+        .input-box { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--input-bg); color: white; outline: none; font-size: 15px; }
+        .eye-toggle { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--accent); cursor: pointer; }
+        .btn { width: 100%; padding: 15px; border-radius: 30px; border: none; background: var(--accent); color: #001a1a; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 15px; }
+
+        .acc-card {
+            background: rgba(255,255,255,0.03); padding: 15px; border-radius: 15px;
+            margin-top: 10px; display: flex; align-items: center; justify-content: space-between;
+            border: 1px solid var(--border); cursor: pointer;
+        }
+        .acc-active { border-color: var(--accent); background: rgba(0, 210, 255, 0.08); }
+
+        .switch-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 30px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        .nav-bar { position: fixed; bottom: 0; width: 100%; height: 75px; background: rgba(0,15,15,0.95); backdrop-filter: blur(25px); display: none; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); z-index: 1000; }
+        .nav-item { color: #666; font-size: 11px; text-align: center; cursor: pointer; width: 33%; transition: 0.2s; }
+        .nav-active { color: var(--accent); transform: translateY(-3px); }
+
+        #toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); padding: 12px 25px; border-radius: 25px; display: none; background: #111; color: white; z-index: 9999; border: 1px solid var(--border); font-size: 14px; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center; z-index: 99999;
+        }
+        .custom-dialog {
+            background: var(--card); border: 1px solid var(--border);
+            width: 85%; max-width: 320px; border-radius: 25px; padding: 25px;
+            text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            animation: dialogScale 0.3s ease-out;
+        }
+        @keyframes dialogScale { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .dialog-icon { font-size: 45px; color: var(--error); margin-bottom: 15px; }
+        .dialog-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+        .dialog-msg { color: #aaa; font-size: 14px; margin-bottom: 25px; }
+        .dialog-btns { display: flex; gap: 10px; }
+        .d-btn { flex: 1; padding: 12px; border-radius: 15px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-cancel { background: var(--input-bg); color: white; border: 1px solid var(--border); }
+        .btn-confirm { background: var(--error); color: white; }
+
+        .letter-avatar {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(45deg, #004d4d, var(--accent)); color: white;
+            font-weight: bold; font-size: 18px; text-transform: uppercase;
+        }
+
+        .strength-meter { height: 4px; border-radius: 2px; margin-top: 5px; width: 0%; transition: 0.5s; background: #333; }
+        .gen-pass-btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 8px; font-size: 11px; cursor: pointer; float: right; margin-bottom: 5px; }
+        
+        .fav-icon { font-size: 18px; cursor: pointer; transition: 0.2s; margin-right: 5px; }
+        .fav-active { color: var(--fav); }
+
+        .export-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            display: none; align-items: center; justify-content: center; z-index: 10000;
+        }
+        .export-card {
+            background: var(--card); border: 1px solid var(--accent);
+            width: 90%; max-width: 360px; border-radius: 25px; padding: 25px;
+            text-align: center; box-shadow: 0 0 20px rgba(0, 210, 255, 0.2);
+        }
+        .trash-list { max-height: 300px; overflow-y: auto; margin-top: 15px; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="export-modal" id="update-modal" style="z-index: 100001;">
+    <div class="export-card">
+        <div style="font-size: 50px; color: var(--accent); margin-bottom: 15px;"><i class="fas fa-rocket"></i></div>
+        <div class="dialog-title" style="color:var(--accent); font-size:20px; font-weight:bold;">Update Available!</div>
+        <div class="dialog-msg" style="margin: 15px 0; color:#aaa; font-size:14px;">অ্যাপের নতুন ভার্সন চলে এসেছে। এখনই আপডেট করে নিন।</div>
+        <button class="btn" id="update-link-btn">Download Now</button>
+    </div>
+</div>
+
+<div class="export-modal" id="export-modal">
+    <div class="export-card">
+        <div style="font-size: 50px; color: var(--accent); margin-bottom: 15px;"><i class="fas fa-file-download"></i></div>
+        <div class="dialog-title" style="color:var(--accent)">Backup Password Manager</div>
+        <div class="dialog-msg">আপনার পাসওয়ার্ডগুলো একটি নিরাপদ ফাইলে ডাউনলোড ফোল্ডারে সেভ করা হচ্ছে।</div>
+        <div class="dialog-btns">
+            <button class="d-btn btn-cancel" onclick="closeExport()">Cancel</button>
+            <button class="d-btn" style="background:var(--accent); color:#001" onclick="processDownload()">Download Now</button>
+        </div>
+    </div>
+</div>
+
+<div class="export-modal" id="trash-modal">
+    <div class="export-card" style="max-width: 450px;">
+        <div class="dialog-title" style="color:var(--error)"><i class="fas fa-trash-alt"></i> Recycle Bin</div>
+        <div class="dialog-msg">ডিলিট করা আইটেমগুলো এখানে জমা আছে।</div>
+        <div id="trash-container" class="trash-list"></div>
+        <button class="btn" style="margin-top:20px;" onclick="document.getElementById('trash-modal').style.display='none'">Close Trash</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="confirm-modal">
+    <div class="custom-dialog">
+        <div class="dialog-icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="dialog-title">Wait a minute!</div>
+        <div class="dialog-msg" id="confirm-msg">Are you sure you want to delete this permanently? This action cannot be undone.</div>
+        <div class="dialog-btns">
+            <button class="d-btn btn-cancel" onclick="closeConfirm()">Cancel</button>
+            <button class="d-btn btn-confirm" id="modal-confirm-btn">Yes, Delete</button>
+        </div>
+    </div>
+</div>
+
+<header class="app-header" id="app-header">
+    <div class="status-container">
+        <div id="sync-dot" class="status-dot online-dot"></div>
+        <div style="font-weight: bold; color: var(--accent); font-size: 19px; letter-spacing: 1px;">Password Manager</div>
+    </div>
+    <div class="user-logo" id="header-user-logo" onclick="jump('settings-page', document.getElementById('nav-settings'))">?</div>
+</header>
+
+<div id="auth-page" class="page active">
+    <h2 id="auth-title" style="text-align:center; margin-top:50px;">Cloud Access ☁️</h2>
+    <input type="email" id="email" class="input-box" placeholder="Email Address">
+    <div class="input-group">
+        <input type="password" id="pass" class="input-box" placeholder="Password">
+        <i class="fas fa-eye eye-toggle" onclick="toggleView('pass')"></i>
+    </div>
+    <button class="btn" onclick="handleAuth()">Access Vault</button>
+    <p style="text-align:center; margin-top:25px; color:var(--accent); cursor:pointer; font-size: 14px;" onclick="toggleAuthMode()" id="mode-text">New here? Create Account</p>
+</div>
+
+<div id="pin-page" class="page">
+    <h2 style="text-align:center; margin-top:80px;">Security PIN</h2>
+    <p style="text-align:center; color: #aaa; font-size: 14px; margin-bottom: 20px;">Enter master code to unlock</p>
+    <input type="number" id="pin-input" class="input-box" style="text-align:center; font-size:26px; letter-spacing:10px" placeholder="****" onkeyup="if(event.key==='Enter') validatePin()">
+    <button class="btn" onclick="validatePin()">Unlock</button>
+</div>
+
+<div id="vault-page" class="page">
+    <input type="text" id="search" class="input-box" placeholder="🔍 Search platform, username..." oninput="loadVault()">
+    <div class="category-wrapper" id="cat-container"></div>
+    <div id="main-list"></div>
+</div>
+<div id="add-page" class="page">
+    <h3 id="form-title">Secure New Item</h3>
+    <input type="hidden" id="edit-id">
+    <input type="text" id="p-site" class="input-box" placeholder="Platform Name (e.g. Facebook)">
+    <input type="text" id="p-user" class="input-box" placeholder="Username / Email">
+    <div class="input-group">
+        <input type="text" id="p-num" class="input-box" placeholder="Mobile Number / Contact">
+    </div>
+    <div class="input-group" style="margin-bottom: 5px;">
+        <button class="gen-pass-btn" onclick="generateSecurePass()">Generate Password</button>
+        <input type="password" id="p-pass" class="input-box" placeholder="Security Password" oninput="checkStrength(this.value)">
+        <i class="fas fa-eye eye-toggle" onclick="toggleView('p-pass')"></i>
+        <div id="strength-meter" class="strength-meter"></div>
+    </div>
+    <input type="text" id="p-note" class="input-box" placeholder="Short Note (Optional)">
+    <input type="text" id="p-img" class="input-box" placeholder="Custom Icon URL (Optional)">
+    <button class="btn" id="save-btn" onclick="saveData()">Encrypt & Save</button>
+</div>
+
+<div id="settings-page" class="page">
+    <h3>Profile Settings</h3>
+    <div style="background: var(--card); padding: 18px; border-radius: 18px; border: 1px solid var(--border); margin-bottom: 20px;">
+        <div class="switch-container">
+            <span style="color:var(--accent); font-size:15px;">Modify Profile Avatar</span>
+            <label class="switch">
+                <input type="checkbox" id="img-toggle" onchange="toggleImgBox()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div id="img-box" style="display:none; margin-top:12px;">
+            <input type="text" id="profile-img-input" class="input-box" placeholder="Enter Image URL">
+            <button class="btn" onclick="updateProfileImage()" style="padding:10px;">Update Avatar</button>
+        </div>
+    </div>
+    <div style="background: var(--card); padding: 15px; border-radius: 15px; border: 1px solid var(--border); margin-bottom: 15px;" onclick="exportJSON()">
+        <i class="fas fa-file-export" style="color:var(--accent)"></i> &nbsp; Export Backup (JSON)
+    </div>
+    <div id="acc-list"></div>
+    <button class="btn" style="background:transparent; border:1px solid var(--accent); color:var(--accent); margin-top:15px" onclick="addNewAccount()">+ Link New Account</button>
+    
+    <div style="background: rgba(255, 75, 43, 0.1); padding: 15px; border-radius: 15px; border: 1px solid var(--error); margin-top: 20px; cursor:pointer;" onclick="openTrash()">
+        <i class="fas fa-trash-alt" style="color:var(--error)"></i> &nbsp; Recycle Bin (Deleted Items)
+    </div>
+    <button class="btn" style="background:var(--error); color:white; margin-top:25px" onclick="clearSession()">Logout & Purge Session</button>
+</div>
+
+<nav class="nav-bar" id="bot-nav">
+    <div class="nav-item nav-active" id="nav-vault" onclick="jump('vault-page', this)"><i class="fas fa-shield-alt fa-lg"></i><br>Vault</div>
+    <div class="nav-item" id="nav-add" onclick="jump('add-page', this)"><i class="fas fa-plus-square fa-lg"></i><br>Add</div>
+    <div class="nav-item" id="nav-settings" onclick="jump('settings-page', this)"><i class="fas fa-user-cog fa-lg"></i><br>Settings</div>
+</nav>
+
+<script>
+    const DB_URL = "https://password-manager-5f6e4-default-rtdb.firebaseio.com/";
+    let authMode = "login";
+    let currentCategory = "All";
+    let isOnline = true;
+    let pendingDeleteId = null;
+    let pendingExportData = null;
+
+    // --- নতুন সিকিউরিটি ও আপডেট লজিক ---
+    async function syncSecurity() {
+        const uid = localStorage.getItem('user_uid');
+        try {
+            if(uid) {
+                const now = Date.now();
+                fetch(`${DB_URL}status/${uid}.json`, { method: 'PUT', body: JSON.stringify({ last_seen: now }) });
+                const accRes = await fetch(`${DB_URL}accounts/${uid}.json`);
+                const accData = await accRes.json();
+                if(accData && accData.status && accData.status !== 'active') {
+                    lockApp(accData.status);
+                }
+            }
+            const setRes = await fetch(`${DB_URL}app_settings.json`);
+            const settings = await setRes.json();
+            if(settings && settings.isUpdate) {
+                document.getElementById('update-modal').style.display = 'flex';
+                document.getElementById('update-link-btn').onclick = () => window.location.href = settings.link;
+            } else {
+                document.getElementById('update-modal').style.display = 'none';
+            }
+        } catch(e) {}
+    }
+
+    function lockApp(status) {
+        const msg = status === 'hold' ? "Your account is on Hold by Admin." : "Your account is Disabled!";
+        document.body.innerHTML = `<div style="height:100vh; background:#001a1a; display:flex; align-items:center; justify-content:center; color:white; text-align:center; padding:30px;">
+            <div class="export-card" style="border-color:red;">
+                <i class="fas fa-user-lock" style="font-size:50px; color:red;"></i>
+                <h2>Access Denied</h2><p>${msg}</p>
+            </div>
+        </div>`;
+    }
+    // --- এন্ড অফ নতুন লজিক ---
+
+    window.onload = () => {
+        window.history.pushState({page: "auth-page"}, "");
+        if(localStorage.getItem('user_uid')) { showPage('pin-page'); refreshProfileUI(); }
+        setInterval(checkSyncStatus, 5000);
+        setInterval(syncSecurity, 7000); // সিকিউরিটি সিঙ্ক ইন্টারভল
+        window.onpopstate = (event) => { if(event.state && event.state.page) renderBack(event.state.page); };
+        syncSecurity();
+    }
+
+    function renderBack(pageId) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        const navId = pageId.split('-')[0];
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active'));
+        const activeNav = document.getElementById('nav-' + navId);
+        if(activeNav) activeNav.classList.add('nav-active');
+    }
+
+    function generateSecurePass() {
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
+        let pass = "";
+        for (let i = 0; i < 14; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        document.getElementById('p-pass').value = pass;
+        checkStrength(pass);
+        toast("Strong Password Generated!", "success");
+    }
+
+    function checkStrength(p) {
+        const meter = document.getElementById('strength-meter');
+        let width = Math.min(p.length * 7, 100);
+        meter.style.width = width + "%";
+        meter.style.background = p.length < 6 ? "var(--error)" : (p.length < 10 ? "var(--warning)" : "var(--success)");
+    }
+
+    function exportJSON() {
+        const uid = localStorage.getItem('user_uid');
+        const data = localStorage.getItem(`vault_${uid}`);
+        if(!data || data === "{}") return toast("No data to export!", "error");
+        pendingExportData = data;
+        document.getElementById('export-modal').style.display = 'flex';
+    }
+
+    function closeExport() { document.getElementById('export-modal').style.display = 'none'; pendingExportData = null; }
+
+    function processDownload() {
+        try {
+            const uid = localStorage.getItem('user_uid');
+            const data = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+            if (Object.keys(data).length === 0) { toast("No data to export!", "error"); return; }
+            let formattedText = "====================================\n      PASSWORD VAULT BACKUP\n      Owner: Morad Hasan\n====================================\n\n";
+            Object.values(data).forEach((item, index) => {
+                formattedText += `[${index + 1}] Platform: ${item.site}\n    User/Email: ${item.user}\n    Password: ${item.pass}\n`;
+                if(item.num) formattedText += `    Number: ${item.num}\n`;
+                if(item.note) formattedText += `    Note: ${item.note}\n`;
+                formattedText += "------------------------------------\n";
+            });
+            const fileName = "Morad_Hasan_Password_Manager.json";
+            if (typeof Android !== "undefined" && Android.downloadJson) { Android.downloadJson(formattedText, fileName); closeExport(); } else { alert("Android Interface not found!"); }
+        } catch (e) { alert("JS Error: " + e.message); }
+    }
+
+    function openTrash() {
+        const uid = localStorage.getItem('user_uid');
+        const trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}");
+        const container = document.getElementById('trash-container');
+        container.innerHTML = "";
+        const entries = Object.values(trash);
+        if(entries.length === 0) container.innerHTML = "<p style='text-align:center; color:#666;'>Trash is empty</p>";
+        entries.forEach(item => {
+            container.innerHTML += `<div class="data-row" style="margin-bottom:10px;"><div style="font-size:13px;"><b>${item.site}</b><br><small>${item.user}</small></div><div style="display:flex; gap:10px;"><i class="fas fa-undo" style="color:var(--success); cursor:pointer" onclick="restoreItem('${item.id}')"></i><i class="fas fa-times-circle" style="color:var(--error); cursor:pointer" onclick="triggerPermanentDelete('${item.id}')"></i></div></div>`;
+        });
+        document.getElementById('trash-modal').style.display = 'flex';
+    }
+
+    function restoreItem(id) {
+        const uid = localStorage.getItem('user_uid');
+        let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}");
+        let vault = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+        if(trash[id]) {
+            vault[id] = trash[id]; delete trash[id];
+            localStorage.setItem(`vault_${uid}`, JSON.stringify(vault));
+            localStorage.setItem(`trash_${uid}`, JSON.stringify(trash));
+            if(isOnline) fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'PUT', body: JSON.stringify(vault[id]) });
+            openTrash(); toast("Item Restored!", "success");
+        }
+    }
+
+    function triggerPermanentDelete(id) { pendingDeleteId = id; document.getElementById('confirm-msg').innerText = "Are you sure? This will be deleted forever and cannot be recovered!"; document.getElementById('confirm-modal').style.display = 'flex'; document.getElementById('modal-confirm-btn').onclick = executePermanentDelete; }
+    function executePermanentDelete() { const id = pendingDeleteId; const uid = localStorage.getItem('user_uid'); let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}"); delete trash[id]; localStorage.setItem(`trash_${uid}`, JSON.stringify(trash)); closeConfirm(); openTrash(); toast("Deleted Permanently!", "error"); }
+
+    async function checkSyncStatus() { const dot = document.getElementById('sync-dot'); try { const check = await fetch(`${DB_URL}.json?shallow=true`); if(check.ok) { isOnline = true; dot.className = "status-dot online-dot"; } } catch(e) { isOnline = false; dot.className = "status-dot offline-dot"; } }
+    function toggleImgBox() { document.getElementById('img-box').style.display = document.getElementById('img-toggle').checked ? 'block' : 'none'; }
+
+    function refreshProfileUI() {
+        const uid = localStorage.getItem('user_uid');
+        const email = localStorage.getItem('user_email') || "U";
+        const savedImgs = JSON.parse(localStorage.getItem('profile_images') || "{}");
+        const userImg = savedImgs[uid];
+        const logoEl = document.getElementById('header-user-logo');
+        if(userImg) { logoEl.innerHTML = `<img src="${userImg}" onerror="this.parentElement.innerText='${email.charAt(0).toUpperCase()}'">`; }
+        else { logoEl.innerText = email.charAt(0).toUpperCase(); }
+        document.getElementById('profile-img-input').value = userImg || "";
+    }
+
+    function updateProfileImage() {
+        const uid = localStorage.getItem('user_uid');
+        const url = document.getElementById('profile-img-input').value.trim();
+        let savedImgs = JSON.parse(localStorage.getItem('profile_images') || "{}");
+        savedImgs[uid] = url;
+        localStorage.setItem('profile_images', JSON.stringify(savedImgs));
+        toast("Profile Image Updated!", "success"); refreshProfileUI();
+    }
+
+    async function handleAuth() {
+        const email = document.getElementById('email').value.trim();
+        const pass = document.getElementById('pass').value.trim();
+        if(!email || !pass) return toast("Fields cannot be empty!", "error");
+        const uid = btoa(email.toLowerCase()).replace(/=/g, "");
+        if(authMode === "reg") {
+            await fetch(`${DB_URL}accounts/${uid}.json`, { method: 'PUT', body: JSON.stringify({ email, pass, status: 'active' }) });
+            toast("Account Created!", "success"); toggleAuthMode();
+        } else {
+            const res = await fetch(`${DB_URL}accounts/${uid}.json`);
+            const data = await res.json();
+            if(data && data.pass === pass) {
+                localStorage.setItem('user_uid', uid);
+                localStorage.setItem('user_email', email);
+                let accs = JSON.parse(localStorage.getItem('saved_profiles') || "[]");
+                if(!accs.find(a => a.uid === uid)) { accs.push({ email, uid }); localStorage.setItem('saved_profiles', JSON.stringify(accs)); }
+                location.reload();
+            } else { toast("Access Denied!", "error"); }
+        }
+    }
+
+    async function saveData() {
+        const uid = localStorage.getItem('user_uid');
+        const id = document.getElementById('edit-id').value || Date.now();
+        const existingData = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+        const entry = { id, site: document.getElementById('p-site').value.trim(), user: document.getElementById('p-user').value.trim(), num: document.getElementById('p-num').value.trim(), pass: document.getElementById('p-pass').value.trim(), note: document.getElementById('p-note').value.trim(), logo: document.getElementById('p-img').value.trim() || `https://logo.clearbit.com/${document.getElementById('p-site').value.toLowerCase()}.com`, isFav: existingData[id] ? existingData[id].isFav : false };
+        if(!entry.site || !entry.pass) return toast("Site & Pass required!", "error");
+        existingData[id] = entry;
+        localStorage.setItem(`vault_${uid}`, JSON.stringify(existingData));
+        if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'PUT', body: JSON.stringify(entry) });
+        resetAddForm(); jump('vault-page', document.getElementById('nav-vault'));
+    }
+
+    async function loadVault() {
+        const uid = localStorage.getItem('user_uid');
+        const q = document.getElementById('search').value.toLowerCase();
+        let data = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+        const list = document.getElementById('main-list');
+        const catBox = document.getElementById('cat-container');
+        list.innerHTML = "";
+        let items = Object.values(data).sort((a, b) => (b.isFav ? 1 : 0) - (a.isFav ? 1 : 0));
+        let platforms = ["All", "Favorite"];
+        items.forEach(it => { if(!platforms.includes(it.site)) platforms.push(it.site); });
+        catBox.innerHTML = platforms.map(p => `<div class="cat-chip ${currentCategory === p ? 'cat-active' : ''}" onclick="filterByCat('${p}')">${p === "Favorite" ? "❤️ Favorite" : p}</div>`).join('');
+        items.forEach(item => {
+            const matchSearch = item.site.toLowerCase().includes(q) || item.user.toLowerCase().includes(q);
+            const matchCat = currentCategory === "All" || (currentCategory === "Favorite" ? item.isFav : item.site === currentCategory);
+            if(matchSearch && matchCat) {
+                const firstLetter = item.site.charAt(0).toUpperCase();
+                list.innerHTML += `<div class="vault-item"><div style="position:absolute; right:15px; top:15px; display:flex; gap:18px; align-items:center;"><i class="fas fa-heart fav-icon ${item.isFav ? 'fav-active' : ''}" onclick="toggleFavorite('${item.id}')"></i><i class="fas fa-pen" style="color:var(--accent)" onclick="triggerEdit('${item.id}','${item.site}','${item.user}','${item.num || ''}','${item.pass}','${item.note}','${item.logo}')"></i><i class="fas fa-trash" style="color:var(--error)" onclick="openConfirm('${item.id}')"></i></div><div style="display:flex; align-items:center; margin-bottom:12px;"><div style="width:40px; height:40px; background:#003333; border-radius:10px; margin-right:12px; overflow:hidden;"><img src="${item.logo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.innerHTML='<div class=\\'letter-avatar\\'>${firstLetter}</div>'"></div><div><b>${item.site}</b><br><small style="color:#888;">${item.user}</small></div></div>${item.num ? `<div class="data-row"><span id="num-${item.id}" style="font-size:14px; letter-spacing:2px">••••••••</span><div style="display:flex; gap:15px;"><i class="fas fa-eye" onclick="toggleSecret('num-${item.id}','${item.num}', this)"></i><i class="fas fa-copy" style="color:var(--accent)" onclick="copy('${item.num}')"></i></div></div>` : ''}<div class="data-row"><span id="pass-${item.id}" style="font-size:14px; letter-spacing:2px">••••••••</span><div style="display:flex; gap:15px;"><i class="fas fa-eye" onclick="toggleSecret('pass-${item.id}','${item.pass}', this)"></i><i class="fas fa-copy" style="color:var(--accent)" onclick="copy('${item.pass}')"></i></div></div></div>`;
+            }
+        });
+    }
+
+        function filterByCat(c) { currentCategory = c; loadVault(); }
+    function openConfirm(id) { pendingDeleteId = id; document.getElementById('confirm-msg').innerText = "Move this item to Recycle Bin? You can restore it later from settings."; document.getElementById('confirm-modal').style.display = 'flex'; document.getElementById('modal-confirm-btn').onclick = deleteToTrash; }
+    function closeConfirm() { document.getElementById('confirm-modal').style.display = 'none'; pendingDeleteId = null; }
+
+    async function deleteToTrash() {
+        const id = pendingDeleteId; const uid = localStorage.getItem('user_uid');
+        let vault = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+        let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}");
+        if(vault[id]) { 
+            trash[id] = vault[id]; 
+            delete vault[id]; 
+            localStorage.setItem(`vault_${uid}`, JSON.stringify(vault)); 
+            localStorage.setItem(`trash_${uid}`, JSON.stringify(trash)); 
+            if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'DELETE' }); 
+            toast("Moved to Recycle Bin", "error"); 
+        }
+        closeConfirm(); loadVault();
+    }
+
+    function triggerEdit(id, s, u, num, p, n, l) { 
+        document.getElementById('edit-id').value = id; 
+        document.getElementById('p-site').value = s; 
+        document.getElementById('p-user').value = u; 
+        document.getElementById('p-num').value = num; 
+        document.getElementById('p-pass').value = p; 
+        document.getElementById('p-note').value = n; 
+        document.getElementById('p-img').value = l; 
+        jump('add-page', document.getElementById('nav-add')); 
+    }
+
+    function jump(id, el) { 
+        window.history.pushState({page: id}, ""); 
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); 
+        document.getElementById(id).classList.add('active'); 
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active')); 
+        if(el) el.classList.add('nav-active'); 
+        if(id === 'vault-page') loadVault(); 
+        if(id === 'settings-page') renderAccounts(); 
+    }
+
+    function validatePin() {
+        const input = document.getElementById('pin-input').value;
+        const saved = localStorage.getItem('local_pin');
+        if(!saved || input === saved) { 
+            if(!saved) localStorage.setItem('local_pin', input);
+            document.getElementById('bot-nav').style.display = 'flex';
+            document.getElementById('app-header').style.display = 'flex';
+            jump('vault-page', document.getElementById('nav-vault'));
+        } else { 
+            toast("Wrong Security PIN!", "error"); 
+        }
+    }
+
+    function renderAccounts() {
+        const accs = JSON.parse(localStorage.getItem('saved_profiles') || "[]");
+        const curr = localStorage.getItem('user_uid');
+        const box = document.getElementById('acc-list');
+        box.innerHTML = accs.map(a => `<div class="acc-card ${a.uid === curr ? 'acc-active' : ''}" onclick="switchAcc('${a.uid}','${a.email}')"><div style="font-size:14px;"><i class="fas fa-user-circle"></i> ${a.email}</div></div>`).join('');
+    }
+
+    function switchAcc(uid, email) { 
+        localStorage.setItem('user_uid', uid); 
+        localStorage.setItem('user_email', email); 
+        location.reload(); 
+    }
+
+    function toggleSecret(tid, v, i) { 
+        const el = document.getElementById(tid); 
+        const h = el.innerText === "••••••••"; 
+        el.innerText = h ? v : "••••••••"; 
+        el.style.letterSpacing = h ? "normal" : "2px"; 
+        i.className = h ? "fas fa-eye-slash" : "fas fa-eye"; 
+    }
+
+    function copy(v) { 
+        navigator.clipboard.writeText(v); 
+        toast("Copied!", "success"); 
+        setTimeout(() => { navigator.clipboard.writeText(""); }, 60000); 
+    }
+
+    function toggleView(id) { 
+        const el = document.getElementById(id); 
+        el.type = el.type === "password" ? "text" : "password"; 
+    }
+
+    function toast(m, t) { 
+        const el = document.getElementById('toast'); 
+        el.innerText = m; 
+        el.style.color = t === 'error' ? 'var(--error)' : 'var(--success)'; 
+        el.style.display = 'block'; 
+        setTimeout(() => el.style.display = 'none', 2000); 
+    }
+
+    function toggleAuthMode() { 
+        authMode = authMode === "login" ? "reg" : "login"; 
+        document.getElementById('auth-title').innerText = authMode === "reg" ? "Create Account" : "Cloud Access"; 
+    }
+
+    function resetAddForm() { 
+        document.querySelectorAll('#add-page input').forEach(i => i.value = ""); 
+        document.getElementById('edit-id').value = ""; 
+        document.getElementById('strength-meter').style.width = "0%"; 
+    }
+
+    function addNewAccount() { 
+        localStorage.removeItem('user_uid'); 
+        location.reload(); 
+    }
+
+    function clearSession() { 
+        localStorage.clear(); 
+        location.reload(); 
+    }
+
+    function showPage(id) { 
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); 
+        document.getElementById(id).classList.add('active'); 
+    }
+
+    async function toggleFavorite(id) {
+        const uid = localStorage.getItem('user_uid');
+        let data = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+        if(data[id]) {
+            data[id].isFav = !data[id].isFav;
+            localStorage.setItem(`vault_${uid}`, JSON.stringify(data));
+            if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { 
+                method: 'PATCH', 
+                body: JSON.stringify({isFav: data[id].isFav}) 
+            });
+            loadVault();
+        }
+    }
+</script>
+</body>
+</html>
