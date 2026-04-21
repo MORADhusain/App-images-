@@ -138,15 +138,6 @@
 
 <div id="toast"></div>
 
-<div class="export-modal" id="update-modal" style="z-index: 100001;">
-    <div class="export-card">
-        <div style="font-size: 50px; color: var(--accent); margin-bottom: 15px;"><i class="fas fa-rocket"></i></div>
-        <div class="dialog-title" style="color:var(--accent); font-size:20px; font-weight:bold;">Update Available!</div>
-        <div class="dialog-msg" style="margin: 15px 0; color:#aaa; font-size:14px;">অ্যাপের নতুন ভার্সন চলে এসেছে। এখনই আপডেট করে নিন।</div>
-        <button class="btn" id="update-link-btn">Download Now</button>
-    </div>
-</div>
-
 <div class="export-modal" id="export-modal">
     <div class="export-card">
         <div style="font-size: 50px; color: var(--accent); margin-bottom: 15px;"><i class="fas fa-file-download"></i></div>
@@ -211,6 +202,7 @@
     <div class="category-wrapper" id="cat-container"></div>
     <div id="main-list"></div>
 </div>
+
 <div id="add-page" class="page">
     <h3 id="form-title">Secure New Item</h3>
     <input type="hidden" id="edit-id">
@@ -271,48 +263,11 @@
     let pendingDeleteId = null;
     let pendingExportData = null;
 
-    // --- নতুন সিকিউরিটি ও আপডেট লজিক ---
-    async function syncSecurity() {
-        const uid = localStorage.getItem('user_uid');
-        try {
-            if(uid) {
-                const now = Date.now();
-                fetch(`${DB_URL}status/${uid}.json`, { method: 'PUT', body: JSON.stringify({ last_seen: now }) });
-                const accRes = await fetch(`${DB_URL}accounts/${uid}.json`);
-                const accData = await accRes.json();
-                if(accData && accData.status && accData.status !== 'active') {
-                    lockApp(accData.status);
-                }
-            }
-            const setRes = await fetch(`${DB_URL}app_settings.json`);
-            const settings = await setRes.json();
-            if(settings && settings.isUpdate) {
-                document.getElementById('update-modal').style.display = 'flex';
-                document.getElementById('update-link-btn').onclick = () => window.location.href = settings.link;
-            } else {
-                document.getElementById('update-modal').style.display = 'none';
-            }
-        } catch(e) {}
-    }
-
-    function lockApp(status) {
-        const msg = status === 'hold' ? "Your account is on Hold by Admin." : "Your account is Disabled!";
-        document.body.innerHTML = `<div style="height:100vh; background:#001a1a; display:flex; align-items:center; justify-content:center; color:white; text-align:center; padding:30px;">
-            <div class="export-card" style="border-color:red;">
-                <i class="fas fa-user-lock" style="font-size:50px; color:red;"></i>
-                <h2>Access Denied</h2><p>${msg}</p>
-            </div>
-        </div>`;
-    }
-    // --- এন্ড অফ নতুন লজিক ---
-
     window.onload = () => {
         window.history.pushState({page: "auth-page"}, "");
         if(localStorage.getItem('user_uid')) { showPage('pin-page'); refreshProfileUI(); }
         setInterval(checkSyncStatus, 5000);
-        setInterval(syncSecurity, 7000); // সিকিউরিটি সিঙ্ক ইন্টারভল
         window.onpopstate = (event) => { if(event.state && event.state.page) renderBack(event.state.page); };
-        syncSecurity();
     }
 
     function renderBack(pageId) {
@@ -351,21 +306,43 @@
     function closeExport() { document.getElementById('export-modal').style.display = 'none'; pendingExportData = null; }
 
     function processDownload() {
-        try {
-            const uid = localStorage.getItem('user_uid');
-            const data = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
-            if (Object.keys(data).length === 0) { toast("No data to export!", "error"); return; }
-            let formattedText = "====================================\n      PASSWORD VAULT BACKUP\n      Owner: Morad Hasan\n====================================\n\n";
-            Object.values(data).forEach((item, index) => {
-                formattedText += `[${index + 1}] Platform: ${item.site}\n    User/Email: ${item.user}\n    Password: ${item.pass}\n`;
-                if(item.num) formattedText += `    Number: ${item.num}\n`;
-                if(item.note) formattedText += `    Note: ${item.note}\n`;
-                formattedText += "------------------------------------\n";
-            });
-            const fileName = "Morad_Hasan_Password_Manager.json";
-            if (typeof Android !== "undefined" && Android.downloadJson) { Android.downloadJson(formattedText, fileName); closeExport(); } else { alert("Android Interface not found!"); }
-        } catch (e) { alert("JS Error: " + e.message); }
+    try {
+        const uid = localStorage.getItem('user_uid');
+        const data = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
+        
+        if (Object.keys(data).length === 0) {
+            toast("No data to export!", "error");
+            return;
+        }
+
+        let formattedText = "====================================\n";
+        formattedText += "      PASSWORD VAULT BACKUP\n";
+        formattedText += "      Owner: Morad Hasan\n";
+        formattedText += "====================================\n\n";
+
+        Object.values(data).forEach((item, index) => {
+            formattedText += `[${index + 1}] Platform: ${item.site}\n`;
+            formattedText += `    User/Email: ${item.user}\n`;
+            formattedText += `    Password: ${item.pass}\n`;
+            if(item.num) formattedText += `    Number: ${item.num}\n`;
+            if(item.note) formattedText += `    Note: ${item.note}\n`;
+            formattedText += "------------------------------------\n";
+        });
+
+        const fileName = "Morad_Hasan_Password_Manager.json";
+
+        // অ্যান্ড্রয়েড ইন্টারফেস চেক এবং কল
+        if (typeof Android !== "undefined" && Android.downloadJson) {
+            Android.downloadJson(formattedText, fileName);
+            closeExport();
+        } else {
+            alert("Android Interface not found!");
+        }
+    } catch (e) {
+        alert("JS Error: " + e.message);
     }
+}
+
 
     function openTrash() {
         const uid = localStorage.getItem('user_uid');
@@ -375,7 +352,14 @@
         const entries = Object.values(trash);
         if(entries.length === 0) container.innerHTML = "<p style='text-align:center; color:#666;'>Trash is empty</p>";
         entries.forEach(item => {
-            container.innerHTML += `<div class="data-row" style="margin-bottom:10px;"><div style="font-size:13px;"><b>${item.site}</b><br><small>${item.user}</small></div><div style="display:flex; gap:10px;"><i class="fas fa-undo" style="color:var(--success); cursor:pointer" onclick="restoreItem('${item.id}')"></i><i class="fas fa-times-circle" style="color:var(--error); cursor:pointer" onclick="triggerPermanentDelete('${item.id}')"></i></div></div>`;
+            container.innerHTML += `
+            <div class="data-row" style="margin-bottom:10px;">
+                <div style="font-size:13px;"><b>${item.site}</b><br><small>${item.user}</small></div>
+                <div style="display:flex; gap:10px;">
+                    <i class="fas fa-undo" style="color:var(--success); cursor:pointer" onclick="restoreItem('${item.id}')"></i>
+                    <i class="fas fa-times-circle" style="color:var(--error); cursor:pointer" onclick="triggerPermanentDelete('${item.id}')"></i>
+                </div>
+            </div>`;
         });
         document.getElementById('trash-modal').style.display = 'flex';
     }
@@ -385,18 +369,40 @@
         let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}");
         let vault = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
         if(trash[id]) {
-            vault[id] = trash[id]; delete trash[id];
+            vault[id] = trash[id];
+            delete trash[id];
             localStorage.setItem(`vault_${uid}`, JSON.stringify(vault));
             localStorage.setItem(`trash_${uid}`, JSON.stringify(trash));
             if(isOnline) fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'PUT', body: JSON.stringify(vault[id]) });
-            openTrash(); toast("Item Restored!", "success");
+            openTrash();
+            toast("Item Restored!", "success");
         }
     }
 
-    function triggerPermanentDelete(id) { pendingDeleteId = id; document.getElementById('confirm-msg').innerText = "Are you sure? This will be deleted forever and cannot be recovered!"; document.getElementById('confirm-modal').style.display = 'flex'; document.getElementById('modal-confirm-btn').onclick = executePermanentDelete; }
-    function executePermanentDelete() { const id = pendingDeleteId; const uid = localStorage.getItem('user_uid'); let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}"); delete trash[id]; localStorage.setItem(`trash_${uid}`, JSON.stringify(trash)); closeConfirm(); openTrash(); toast("Deleted Permanently!", "error"); }
+    // New: Handle Professional Delete Dialog for Trash
+    function triggerPermanentDelete(id) {
+        pendingDeleteId = id;
+        document.getElementById('confirm-msg').innerText = "Are you sure? This will be deleted forever and cannot be recovered!";
+        document.getElementById('confirm-modal').style.display = 'flex';
+        document.getElementById('modal-confirm-btn').onclick = executePermanentDelete;
+    }
 
-    async function checkSyncStatus() { const dot = document.getElementById('sync-dot'); try { const check = await fetch(`${DB_URL}.json?shallow=true`); if(check.ok) { isOnline = true; dot.className = "status-dot online-dot"; } } catch(e) { isOnline = false; dot.className = "status-dot offline-dot"; } }
+    function executePermanentDelete() {
+        const id = pendingDeleteId;
+        const uid = localStorage.getItem('user_uid');
+        let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}");
+        delete trash[id];
+        localStorage.setItem(`trash_${uid}`, JSON.stringify(trash));
+        closeConfirm();
+        openTrash();
+        toast("Deleted Permanently!", "error");
+    }
+
+    async function checkSyncStatus() {
+        const dot = document.getElementById('sync-dot');
+        try { const check = await fetch(`${DB_URL}.json?shallow=true`); if(check.ok) { isOnline = true; dot.className = "status-dot online-dot"; } } catch(e) { isOnline = false; dot.className = "status-dot offline-dot"; }
+    }
+
     function toggleImgBox() { document.getElementById('img-box').style.display = document.getElementById('img-toggle').checked ? 'block' : 'none'; }
 
     function refreshProfileUI() {
@@ -416,7 +422,8 @@
         let savedImgs = JSON.parse(localStorage.getItem('profile_images') || "{}");
         savedImgs[uid] = url;
         localStorage.setItem('profile_images', JSON.stringify(savedImgs));
-        toast("Profile Image Updated!", "success"); refreshProfileUI();
+        toast("Profile Image Updated!", "success");
+        refreshProfileUI();
     }
 
     async function handleAuth() {
@@ -425,7 +432,7 @@
         if(!email || !pass) return toast("Fields cannot be empty!", "error");
         const uid = btoa(email.toLowerCase()).replace(/=/g, "");
         if(authMode === "reg") {
-            await fetch(`${DB_URL}accounts/${uid}.json`, { method: 'PUT', body: JSON.stringify({ email, pass, status: 'active' }) });
+            await fetch(`${DB_URL}accounts/${uid}.json`, { method: 'PUT', body: JSON.stringify({ email, pass }) });
             toast("Account Created!", "success"); toggleAuthMode();
         } else {
             const res = await fetch(`${DB_URL}accounts/${uid}.json`);
@@ -444,12 +451,21 @@
         const uid = localStorage.getItem('user_uid');
         const id = document.getElementById('edit-id').value || Date.now();
         const existingData = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
-        const entry = { id, site: document.getElementById('p-site').value.trim(), user: document.getElementById('p-user').value.trim(), num: document.getElementById('p-num').value.trim(), pass: document.getElementById('p-pass').value.trim(), note: document.getElementById('p-note').value.trim(), logo: document.getElementById('p-img').value.trim() || `https://logo.clearbit.com/${document.getElementById('p-site').value.toLowerCase()}.com`, isFav: existingData[id] ? existingData[id].isFav : false };
+        const entry = {
+            id, site: document.getElementById('p-site').value.trim(),
+            user: document.getElementById('p-user').value.trim(),
+            num: document.getElementById('p-num').value.trim(),
+            pass: document.getElementById('p-pass').value.trim(),
+            note: document.getElementById('p-note').value.trim(),
+            logo: document.getElementById('p-img').value.trim() || `https://logo.clearbit.com/${document.getElementById('p-site').value.toLowerCase()}.com`,
+            isFav: existingData[id] ? existingData[id].isFav : false 
+        };
         if(!entry.site || !entry.pass) return toast("Site & Pass required!", "error");
         existingData[id] = entry;
         localStorage.setItem(`vault_${uid}`, JSON.stringify(existingData));
         if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'PUT', body: JSON.stringify(entry) });
-        resetAddForm(); jump('vault-page', document.getElementById('nav-vault'));
+        resetAddForm();
+        jump('vault-page', document.getElementById('nav-vault'));
     }
 
     async function loadVault() {
@@ -468,49 +484,70 @@
             const matchCat = currentCategory === "All" || (currentCategory === "Favorite" ? item.isFav : item.site === currentCategory);
             if(matchSearch && matchCat) {
                 const firstLetter = item.site.charAt(0).toUpperCase();
-                list.innerHTML += `<div class="vault-item"><div style="position:absolute; right:15px; top:15px; display:flex; gap:18px; align-items:center;"><i class="fas fa-heart fav-icon ${item.isFav ? 'fav-active' : ''}" onclick="toggleFavorite('${item.id}')"></i><i class="fas fa-pen" style="color:var(--accent)" onclick="triggerEdit('${item.id}','${item.site}','${item.user}','${item.num || ''}','${item.pass}','${item.note}','${item.logo}')"></i><i class="fas fa-trash" style="color:var(--error)" onclick="openConfirm('${item.id}')"></i></div><div style="display:flex; align-items:center; margin-bottom:12px;"><div style="width:40px; height:40px; background:#003333; border-radius:10px; margin-right:12px; overflow:hidden;"><img src="${item.logo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.innerHTML='<div class=\\'letter-avatar\\'>${firstLetter}</div>'"></div><div><b>${item.site}</b><br><small style="color:#888;">${item.user}</small></div></div>${item.num ? `<div class="data-row"><span id="num-${item.id}" style="font-size:14px; letter-spacing:2px">••••••••</span><div style="display:flex; gap:15px;"><i class="fas fa-eye" onclick="toggleSecret('num-${item.id}','${item.num}', this)"></i><i class="fas fa-copy" style="color:var(--accent)" onclick="copy('${item.num}')"></i></div></div>` : ''}<div class="data-row"><span id="pass-${item.id}" style="font-size:14px; letter-spacing:2px">••••••••</span><div style="display:flex; gap:15px;"><i class="fas fa-eye" onclick="toggleSecret('pass-${item.id}','${item.pass}', this)"></i><i class="fas fa-copy" style="color:var(--accent)" onclick="copy('${item.pass}')"></i></div></div></div>`;
+                list.innerHTML += `
+                <div class="vault-item">
+                    <div style="position:absolute; right:15px; top:15px; display:flex; gap:18px; align-items:center;">
+                        <i class="fas fa-heart fav-icon ${item.isFav ? 'fav-active' : ''}" onclick="toggleFavorite('${item.id}')"></i>
+                        <i class="fas fa-pen" style="color:var(--accent)" onclick="triggerEdit('${item.id}','${item.site}','${item.user}','${item.num || ''}','${item.pass}','${item.note}','${item.logo}')"></i>
+                        <i class="fas fa-trash" style="color:var(--error)" onclick="openConfirm('${item.id}')"></i>
+                    </div>
+                    <div style="display:flex; align-items:center; margin-bottom:12px;">
+                        <div style="width:40px; height:40px; background:#003333; border-radius:10px; margin-right:12px; overflow:hidden;">
+                            <img src="${item.logo}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.innerHTML='<div class=\\'letter-avatar\\'>${firstLetter}</div>'">
+                        </div>
+                        <div><b>${item.site}</b><br><small style="color:#888;">${item.user}</small></div>
+                    </div>
+                    ${item.num ? `<div class="data-row"><span id="num-${item.id}" style="font-size:14px; letter-spacing:2px">••••••••</span><div style="display:flex; gap:15px;"><i class="fas fa-eye" onclick="toggleSecret('num-${item.id}','${item.num}', this)"></i><i class="fas fa-copy" style="color:var(--accent)" onclick="copy('${item.num}')"></i></div></div>` : ''}
+                    <div class="data-row"><span id="pass-${item.id}" style="font-size:14px; letter-spacing:2px">••••••••</span><div style="display:flex; gap:15px;"><i class="fas fa-eye" onclick="toggleSecret('pass-${item.id}','${item.pass}', this)"></i><i class="fas fa-copy" style="color:var(--accent)" onclick="copy('${item.pass}')"></i></div></div>
+                </div>`;
             }
         });
     }
 
-        function filterByCat(c) { currentCategory = c; loadVault(); }
-    function openConfirm(id) { pendingDeleteId = id; document.getElementById('confirm-msg').innerText = "Move this item to Recycle Bin? You can restore it later from settings."; document.getElementById('confirm-modal').style.display = 'flex'; document.getElementById('modal-confirm-btn').onclick = deleteToTrash; }
+    function filterByCat(c) { currentCategory = c; loadVault(); }
+
+    function openConfirm(id) {
+        pendingDeleteId = id;
+        document.getElementById('confirm-msg').innerText = "Move this item to Recycle Bin? You can restore it later from settings.";
+        document.getElementById('confirm-modal').style.display = 'flex';
+        document.getElementById('modal-confirm-btn').onclick = deleteToTrash;
+    }
+
     function closeConfirm() { document.getElementById('confirm-modal').style.display = 'none'; pendingDeleteId = null; }
 
     async function deleteToTrash() {
-        const id = pendingDeleteId; const uid = localStorage.getItem('user_uid');
+        const id = pendingDeleteId;
+        const uid = localStorage.getItem('user_uid');
         let vault = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
         let trash = JSON.parse(localStorage.getItem(`trash_${uid}`) || "{}");
-        if(vault[id]) { 
-            trash[id] = vault[id]; 
-            delete vault[id]; 
-            localStorage.setItem(`vault_${uid}`, JSON.stringify(vault)); 
-            localStorage.setItem(`trash_${uid}`, JSON.stringify(trash)); 
-            if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'DELETE' }); 
-            toast("Moved to Recycle Bin", "error"); 
+        if(vault[id]) {
+            trash[id] = vault[id];
+            delete vault[id];
+            localStorage.setItem(`vault_${uid}`, JSON.stringify(vault));
+            localStorage.setItem(`trash_${uid}`, JSON.stringify(trash));
+            if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { method: 'DELETE' });
+            toast("Moved to Recycle Bin", "error");
         }
-        closeConfirm(); loadVault();
+        closeConfirm();
+        loadVault();
     }
 
-    function triggerEdit(id, s, u, num, p, n, l) { 
-        document.getElementById('edit-id').value = id; 
-        document.getElementById('p-site').value = s; 
-        document.getElementById('p-user').value = u; 
-        document.getElementById('p-num').value = num; 
-        document.getElementById('p-pass').value = p; 
-        document.getElementById('p-note').value = n; 
-        document.getElementById('p-img').value = l; 
-        jump('add-page', document.getElementById('nav-add')); 
+    function triggerEdit(id, s, u, num, p, n, l) {
+        document.getElementById('edit-id').value = id;
+        document.getElementById('p-site').value = s; document.getElementById('p-user').value = u;
+        document.getElementById('p-num').value = num; document.getElementById('p-pass').value = p;
+        document.getElementById('p-note').value = n; document.getElementById('p-img').value = l;
+        jump('add-page', document.getElementById('nav-add'));
     }
 
-    function jump(id, el) { 
-        window.history.pushState({page: id}, ""); 
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); 
-        document.getElementById(id).classList.add('active'); 
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active')); 
-        if(el) el.classList.add('nav-active'); 
-        if(id === 'vault-page') loadVault(); 
-        if(id === 'settings-page') renderAccounts(); 
+    function jump(id, el) {
+        window.history.pushState({page: id}, "");
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active'));
+        if(el) el.classList.add('nav-active');
+        if(id === 'vault-page') loadVault();
+        if(id === 'settings-page') renderAccounts();
     }
 
     function validatePin() {
@@ -521,9 +558,7 @@
             document.getElementById('bot-nav').style.display = 'flex';
             document.getElementById('app-header').style.display = 'flex';
             jump('vault-page', document.getElementById('nav-vault'));
-        } else { 
-            toast("Wrong Security PIN!", "error"); 
-        }
+        } else { toast("Wrong Security PIN!", "error"); }
     }
 
     function renderAccounts() {
@@ -533,78 +568,16 @@
         box.innerHTML = accs.map(a => `<div class="acc-card ${a.uid === curr ? 'acc-active' : ''}" onclick="switchAcc('${a.uid}','${a.email}')"><div style="font-size:14px;"><i class="fas fa-user-circle"></i> ${a.email}</div></div>`).join('');
     }
 
-    function switchAcc(uid, email) { 
-        localStorage.setItem('user_uid', uid); 
-        localStorage.setItem('user_email', email); 
-        location.reload(); 
-    }
-
-    function toggleSecret(tid, v, i) { 
-        const el = document.getElementById(tid); 
-        const h = el.innerText === "••••••••"; 
-        el.innerText = h ? v : "••••••••"; 
-        el.style.letterSpacing = h ? "normal" : "2px"; 
-        i.className = h ? "fas fa-eye-slash" : "fas fa-eye"; 
-    }
-
-    function copy(v) { 
-        navigator.clipboard.writeText(v); 
-        toast("Copied!", "success"); 
-        setTimeout(() => { navigator.clipboard.writeText(""); }, 60000); 
-    }
-
-    function toggleView(id) { 
-        const el = document.getElementById(id); 
-        el.type = el.type === "password" ? "text" : "password"; 
-    }
-
-    function toast(m, t) { 
-        const el = document.getElementById('toast'); 
-        el.innerText = m; 
-        el.style.color = t === 'error' ? 'var(--error)' : 'var(--success)'; 
-        el.style.display = 'block'; 
-        setTimeout(() => el.style.display = 'none', 2000); 
-    }
-
-    function toggleAuthMode() { 
-        authMode = authMode === "login" ? "reg" : "login"; 
-        document.getElementById('auth-title').innerText = authMode === "reg" ? "Create Account" : "Cloud Access"; 
-    }
-
-    function resetAddForm() { 
-        document.querySelectorAll('#add-page input').forEach(i => i.value = ""); 
-        document.getElementById('edit-id').value = ""; 
-        document.getElementById('strength-meter').style.width = "0%"; 
-    }
-
-    function addNewAccount() { 
-        localStorage.removeItem('user_uid'); 
-        location.reload(); 
-    }
-
-    function clearSession() { 
-        localStorage.clear(); 
-        location.reload(); 
-    }
-
-    function showPage(id) { 
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); 
-        document.getElementById(id).classList.add('active'); 
-    }
-
-    async function toggleFavorite(id) {
-        const uid = localStorage.getItem('user_uid');
-        let data = JSON.parse(localStorage.getItem(`vault_${uid}`) || "{}");
-        if(data[id]) {
-            data[id].isFav = !data[id].isFav;
-            localStorage.setItem(`vault_${uid}`, JSON.stringify(data));
-            if(isOnline) await fetch(`${DB_URL}data/${uid}/${id}.json`, { 
-                method: 'PATCH', 
-                body: JSON.stringify({isFav: data[id].isFav}) 
-            });
-            loadVault();
-        }
-    }
+    function switchAcc(uid, email) { localStorage.setItem('user_uid', uid); localStorage.setItem('user_email', email); location.reload(); }
+    function toggleSecret(tid, v, i) { const el = document.getElementById(tid); const h = el.innerText === "••••••••"; el.innerText = h ? v : "••••••••"; el.style.letterSpacing = h ? "normal" : "2px"; i.className = h ? "fas fa-eye-slash" : "fas fa-eye"; }
+    function copy(v) { navigator.clipboard.writeText(v); toast("Copied!", "success"); setTimeout(() => { navigator.clipboard.writeText(""); }, 60000); }
+    function toggleView(id) { const el = document.getElementById(id); el.type = el.type === "password" ? "text" : "password"; }
+    function toast(m, t) { const el = document.getElementById('toast'); el.innerText = m; el.style.color = t === 'error' ? 'var(--error)' : 'var(--success)'; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 2000); }
+    function toggleAuthMode() { authMode = authMode === "login" ? "reg" : "login"; document.getElementById('auth-title').innerText = authMode === "reg" ? "Create Account" : "Cloud Access"; }
+    function resetAddForm() { document.querySelectorAll('#add-page input').forEach(i => i.value = ""); document.getElementById('edit-id').value = ""; document.getElementById('strength-meter').style.width = "0%"; }
+    function addNewAccount() { localStorage.removeItem('user_uid'); location.reload(); }
+    function clearSession() { localStorage.clear(); location.reload(); }
+    function showPage(id) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 </script>
 </body>
 </html>
