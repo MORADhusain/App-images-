@@ -271,77 +271,7 @@
     let pendingDeleteId = null;
     let pendingExportData = null;
 
-    // --- নোটিফিকেশন লজিক ---
-        // --- নোটিফিকেশন লজিক (সংশোধিত) ---
-    async function requestNotifPermission() {
-        if ("Notification" in window) {
-            await Notification.requestPermission();
-        }
-    }
-
-    async function checkNotifications() {
-        try {
-            // ডাটাবেস থেকে নোটিফিকেশন ডাটা ফেচ করা
-            const res = await fetch(`${DB_URL}notification.json`);
-            const notif = await res.json();
-            
-            if (notif && notif.active) {
-                const lastShownTime = localStorage.getItem('last_notif_time');
-                
-                // যদি এটি নতুন নোটিফিকেশন হয়
-                if (notif.time && notif.time.toString() !== lastShownTime) {
-                    const title = "Alert from Admin";
-                    const message = notif.message;
-                    let notificationSent = false;
-
-                    // ১. অ্যান্ড্রয়েড সিস্টেম ইন্টারফেস (Smali) চেক
-// window.Android অথবা সরাসরি Android অবজেক্ট চেক করা হচ্ছে
-const androidBridge = window.Android || (typeof Android !== "undefined" ? Android : null);
-
-if (androidBridge && typeof androidBridge.pushSystemNotification === "function") {
-    try {
-        // স্মালি মেথড কল করা হচ্ছে
-        androidBridge.pushSystemNotification(title, message);
-        notificationSent = true;
-        console.log("System Notification Sent via Smali Bridge");
-    } catch (err) {
-        console.error("Smali Bridge Execution Error: ", err);
-        // যদি স্মালি মেথডে এরর হয়, তবে notificationSent false থাকবে এবং ব্যাকআপ কাজ করবে
-    }
-} else {
-    console.log("Android Bridge not found or pushSystemNotification method missing");
-}
- 
-
-                    // ২. ব্রাউজার নোটিফিকেশন (ব্যাকআপ ১)
-                    if (!notificationSent && "Notification" in window && Notification.permission === "granted") {
-                        new Notification(title, { body: message });
-                        notificationSent = true;
-                    }
-
-                    // ৩. অ্যাপের ভেতর টোস্ট (ব্যাকআপ ২)
-                    if (!notificationSent) {
-                        toast(message, "success");
-                    }
-                    
-                    localStorage.setItem('last_notif_time', notif.time.toString());
-                }
-            }
-        } catch (e) {
-            console.log("Notification check failed: " + e);
-        }
-    }
-
-    function showBrowserNotification(title, body) {
-        if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(title, { body: body, icon: 'https://cdn-icons-png.flaticon.com/512/561/561127.png' });
-        } else {
-            toast(body, "success");
-        }
-    }
-
-
-    // --- সিকিউরিটি ও আপডেট লজিক ---
+    // --- নতুন সিকিউরিটি ও আপডেট লজিক ---
     async function syncSecurity() {
         const uid = localStorage.getItem('user_uid');
         try {
@@ -362,9 +292,6 @@ if (androidBridge && typeof androidBridge.pushSystemNotification === "function")
             } else {
                 document.getElementById('update-modal').style.display = 'none';
             }
-            
-            checkNotifications();
-            
         } catch(e) {}
     }
 
@@ -377,15 +304,13 @@ if (androidBridge && typeof androidBridge.pushSystemNotification === "function")
             </div>
         </div>`;
     }
+    // --- এন্ড অফ নতুন লজিক ---
 
     window.onload = () => {
         window.history.pushState({page: "auth-page"}, "");
         if(localStorage.getItem('user_uid')) { showPage('pin-page'); refreshProfileUI(); }
-        
-        requestNotifPermission();
-        
         setInterval(checkSyncStatus, 5000);
-        setInterval(syncSecurity, 7000); 
+        setInterval(syncSecurity, 7000); // সিকিউরিটি সিঙ্ক ইন্টারভল
         window.onpopstate = (event) => { if(event.state && event.state.page) renderBack(event.state.page); };
         syncSecurity();
     }
@@ -548,7 +473,7 @@ if (androidBridge && typeof androidBridge.pushSystemNotification === "function")
         });
     }
 
-    function filterByCat(c) { currentCategory = c; loadVault(); }
+        function filterByCat(c) { currentCategory = c; loadVault(); }
     function openConfirm(id) { pendingDeleteId = id; document.getElementById('confirm-msg').innerText = "Move this item to Recycle Bin? You can restore it later from settings."; document.getElementById('confirm-modal').style.display = 'flex'; document.getElementById('modal-confirm-btn').onclick = deleteToTrash; }
     function closeConfirm() { document.getElementById('confirm-modal').style.display = 'none'; pendingDeleteId = null; }
 
