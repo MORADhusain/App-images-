@@ -1,7 +1,7 @@
 {
   "dialog_config": {
     "show_dialog": true,
-    "show_once_per_app_launch": true,
+    "show_once_per_app_launch": false,
     "allow_close": true,
     "title": "Sorry!",
     "message": "This service is temporarily unavailable on your bKash account. <br> Please call: 16247",
