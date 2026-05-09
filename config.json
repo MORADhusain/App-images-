@@ -1,12 +1,14 @@
 {
   "dialog_config": {
     "show_dialog": true,
-    "show_once_per_app_launch": false,
+    "show_once_per_app_launch": true,
     "allow_close": true,
     "title": "Sorry!",
     "message": "This service is temporarily unavailable on your bKash account. <br> Please call: 16247",
-    "logo_url": "https://github.com/MORADhusain/App-images-/raw/refs/heads/main/07-14-AM_Saturday.png",
+    "logo_url": "https://raw.githubusercontent.com/MORADhusain/App-images-/main/07-14-AM_Saturday.png",
     "main_color": "#D81B60",
-    "bg_light": "#FCE4EC"
+    "bg_light": "#FCE4EC",
+    "text_color": "#424242",
+    "image_size": "100"
   }
 }
